@@ -1,0 +1,213 @@
+
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Recaudación de Choferes</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f4f4f4;
+      padding: 20px;
+    }
+    .container {
+      max-width: 700px;
+      margin: auto;
+      background: #fff;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.1);
+    }
+    h2 {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+    label {
+      display: block;
+      margin-top: 10px;
+    }
+    input, select, button {
+      padding: 8px;
+      margin-top: 5px;
+      width: 100%;
+      box-sizing: border-box;
+    }
+    button {
+      margin-top: 15px;
+      background-color: #007bff;
+      color: white;
+      border: none;
+      cursor: pointer;
+      border-radius: 5px;
+    }
+    button:hover {
+      background-color: #0056b3;
+    }
+    .hidden {
+      display: none;
+    }
+    #resultados {
+      margin-top: 20px;
+      background: #eef;
+      padding: 10px;
+      border-radius: 5px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- LOGIN -->
+    <div id="login">
+      <h2>Acceso</h2>
+      <label for="clave">Contraseña:</label>
+      <input type="password" id="clave" />
+      <button onclick="verificarClave()">Ingresar</button>
+    </div>
+
+    <!-- APP -->
+    <div id="app" class="hidden">
+      <h2>Recaudación de Choferes</h2>
+
+      <label for="fecha">Fecha:</label>
+      <input type="date" id="fecha" />
+
+      <label for="chofer">Chofer:</label>
+      <select id="chofer"></select>
+      <button onclick="agregarChofer()">Agregar chofer</button>
+      <button onclick="editarChofer()">Editar chofer</button>
+      <button onclick="borrarChofer()">Eliminar chofer</button>
+
+      <label for="datos">Billetes y fajos (ej: 10, 2f, 5f, 100):</label>
+      <input type="text" id="datos" placeholder="Separá con coma o espacio"/>
+
+      <button onclick="guardarDatos()">Guardar</button>
+      <button onclick="verTotales()">Ver Totales</button>
+
+      <div id="resultados"></div>
+    </div>
+  </div>
+
+  <script>
+    const CLAVE = "ocampocomegatos";
+    const SHEET_URL = "https://script.google.com/macros/s/AKfycbxlcibKfuCmrebh-AA_RsPx0fqWkjkHS6nDcpX3fDVB2fYCM6nlxdOZ5FvruwwpesYa2w/exec";
+
+    let choferes = [];
+
+    function verificarClave() {
+      const claveIngresada = document.getElementById("clave").value;
+      if (claveIngresada === CLAVE) {
+        document.getElementById("login").classList.add("hidden");
+        document.getElementById("app").classList.remove("hidden");
+        cargarChoferes();
+      } else {
+        alert("Contraseña incorrecta.");
+      }
+    }
+
+    function cargarChoferes() {
+      choferes = JSON.parse(localStorage.getItem("choferes")) || ["Chofer 1", "Chofer 2"];
+      actualizarSelector();
+    }
+
+    function actualizarSelector() {
+      const select = document.getElementById("chofer");
+      select.innerHTML = "";
+      choferes.forEach((c, i) => {
+        const option = document.createElement("option");
+        option.value = i;
+        option.textContent = c;
+        select.appendChild(option);
+      });
+    }
+
+    function agregarChofer() {
+      const nuevo = prompt("Nombre del nuevo chofer:");
+      if (nuevo) {
+        choferes.push(nuevo);
+        guardarChoferes();
+      }
+    }
+
+    function editarChofer() {
+      const idx = document.getElementById("chofer").value;
+      const nuevo = prompt("Editar nombre:", choferes[idx]);
+      if (nuevo) {
+        choferes[idx] = nuevo;
+        guardarChoferes();
+      }
+    }
+
+    function borrarChofer() {
+      const idx = document.getElementById("chofer").value;
+      if (confirm(`¿Eliminar a ${choferes[idx]}?`)) {
+        choferes.splice(idx, 1);
+        guardarChoferes();
+      }
+    }
+
+    function guardarChoferes() {
+      localStorage.setItem("choferes", JSON.stringify(choferes));
+      actualizarSelector();
+    }
+
+    function parsearDatos(texto) {
+      const partes = texto.split(/[, ]+/);
+      let total = 0;
+      partes.forEach(p => {
+        if (p.endsWith("f")) {
+          total += parseInt(p) * 100;
+        } else {
+          total += parseInt(p);
+        }
+      });
+      return total;
+    }
+
+    async function guardarDatos() {
+      const fecha = document.getElementById("fecha").value;
+      const chofer = choferes[document.getElementById("chofer").value];
+      const datosTexto = document.getElementById("datos").value;
+
+      if (!fecha || !datosTexto) {
+        alert("Completá todos los campos.");
+        return;
+      }
+
+      const total = parsearDatos(datosTexto);
+
+      const data = { fecha, chofer, total };
+
+      try {
+        await fetch(SHEET_URL, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(data)
+        });
+        alert("Datos guardados correctamente.");
+        document.getElementById("datos").value = "";
+      } catch (e) {
+        alert("Error al guardar datos.");
+        console.error(e);
+      }
+    }
+
+    async function verTotales() {
+      try {
+        const res = await fetch(SHEET_URL);
+        const data = await res.json();
+
+        let html = "<h4>Totales guardados:</h4><ul>";
+        data.forEach(row => {
+          html += `<li>${row.fecha} - ${row.chofer}: $${row.total}</li>`;
+        });
+        html += "</ul>";
+        document.getElementById("resultados").innerHTML = html;
+      } catch (e) {
+        alert("Error al obtener totales.");
+        console.error(e);
+      }
+    }
+  </script>
+</body>
+</html>
