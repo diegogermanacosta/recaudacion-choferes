@@ -1,213 +1,171 @@
-
 <!DOCTYPE html>
 <html lang="es">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Recaudación de Choferes</title>
+  <title>Recaudación Choferes</title>
   <style>
     body {
       font-family: Arial, sans-serif;
-      background: #f4f4f4;
-      padding: 20px;
+      margin: 30px;
+      background-color: #f5f7fa;
     }
-    .container {
-      max-width: 700px;
-      margin: auto;
-      background: #fff;
-      padding: 20px;
-      border-radius: 8px;
-      box-shadow: 0 0 10px rgba(0,0,0,0.1);
-    }
+
     h2 {
       text-align: center;
-      margin-bottom: 20px;
+      margin-bottom: 10px;
     }
-    label {
-      display: block;
-      margin-top: 10px;
-    }
-    input, select, button {
-      padding: 8px;
-      margin-top: 5px;
+
+    .tabla {
       width: 100%;
-      box-sizing: border-box;
+      max-width: 600px;
+      margin: 0 auto 30px;
+      border-collapse: collapse;
     }
-    button {
-      margin-top: 15px;
-      background-color: #007bff;
-      color: white;
-      border: none;
-      cursor: pointer;
-      border-radius: 5px;
+
+    .tabla th, .tabla td {
+      padding: 10px;
+      text-align: center;
+      border: 1px solid #ccc;
     }
-    button:hover {
-      background-color: #0056b3;
+
+    .sueltos {
+      background-color: #ffe08a;
     }
-    .hidden {
+
+    .fajos {
+      background-color: #b4e1b3;
+    }
+
+    .total-row {
+      background-color: #add8e6;
+      font-weight: bold;
+    }
+
+    select, input, button {
+      padding: 8px;
+      font-size: 16px;
+      margin: 5px;
+    }
+
+    .contenedor {
+      text-align: center;
+    }
+
+    .oculto {
       display: none;
     }
-    #resultados {
-      margin-top: 20px;
-      background: #eef;
-      padding: 10px;
-      border-radius: 5px;
+
+    .fila-grupo th {
+      background-color: #e0e0e0;
+      font-style: italic;
     }
   </style>
 </head>
 <body>
-  <div class="container">
-    <!-- LOGIN -->
-    <div id="login">
-      <h2>Acceso</h2>
-      <label for="clave">Contraseña:</label>
-      <input type="password" id="clave" />
-      <button onclick="verificarClave()">Ingresar</button>
-    </div>
+  <h2>Recaudación de Choferes</h2>
 
-    <!-- APP -->
-    <div id="app" class="hidden">
-      <h2>Recaudación de Choferes</h2>
+  <div class="contenedor">
+    <label for="chofer">Seleccionar chofer:</label>
+    <select id="chofer">
+      <option value="Ocampo">Ocampo</option>
+      <option value="Pérez">Coria</option>
+      <option value="Rodríguez">Mauro</option>
+    </select>
 
-      <label for="fecha">Fecha:</label>
-      <input type="date" id="fecha" />
-
-      <label for="chofer">Chofer:</label>
-      <select id="chofer"></select>
-      <button onclick="agregarChofer()">Agregar chofer</button>
-      <button onclick="editarChofer()">Editar chofer</button>
-      <button onclick="borrarChofer()">Eliminar chofer</button>
-
-      <label for="datos">Billetes y fajos (ej: 10, 2f, 5f, 100):</label>
-      <input type="text" id="datos" placeholder="Separá con coma o espacio"/>
-
-      <button onclick="guardarDatos()">Guardar</button>
-      <button onclick="verTotales()">Ver Totales</button>
-
-      <div id="resultados"></div>
-    </div>
+    <input type="date" id="fecha" value="">
+    <input type="password" id="pass" placeholder="Contraseña">
+    <button onclick="guardarDatos()">Guardar</button>
   </div>
 
+  <table class="tabla">
+    <thead>
+      <tr><th>Billetes</th><th>Cantidad</th><th>Suma</th></tr>
+    </thead>
+    <tbody id="tabla">
+      <tr class="fila-grupo"><th colspan="3">BILLETES SUELTOS</th></tr>
+    </tbody>
+    <tbody id="fajos">
+      <tr class="fila-grupo"><th colspan="3">FAJOS</th></tr>
+    </tbody>
+    <tfoot>
+      <tr class="total-row"><td colspan="2">TOTAL</td><td id="total">0</td></tr>
+    </tfoot>
+  </table>
+
   <script>
-    const CLAVE = "ocampocomegatos";
-    const SHEET_URL = "https://script.google.com/macros/s/AKfycbxlcibKfuCmrebh-AA_RsPx0fqWkjkHS6nDcpX3fDVB2fYCM6nlxdOZ5FvruwwpesYa2w/exec";
+    const denominaciones = [20000, 10000, 2000, 1000, 500, 200, 100, 50, 20, 10];
+    const contenedorSueltos = document.getElementById("tabla");
+    const contenedorFajos = document.getElementById("fajos");
+    const passInput = document.getElementById("pass");
+    const fechaInput = document.getElementById("fecha");
+    fechaInput.valueAsDate = new Date();
 
-    let choferes = [];
-
-    function verificarClave() {
-      const claveIngresada = document.getElementById("clave").value;
-      if (claveIngresada === CLAVE) {
-        document.getElementById("login").classList.add("hidden");
-        document.getElementById("app").classList.remove("hidden");
-        cargarChoferes();
-      } else {
-        alert("Contraseña incorrecta.");
-      }
+    function crearFila(valor, contenedor, tipo) {
+      const tr = document.createElement("tr");
+      tr.className = tipo === "fajo" ? "fajos" : "sueltos";
+      tr.innerHTML = `
+        <td>${valor.toLocaleString()}</td>
+        <td><input type="number" min="0" value="0" oninput="actualizarTotal()"></td>
+        <td class="suma">0</td>
+      `;
+      contenedor.appendChild(tr);
     }
 
-    function cargarChoferes() {
-      choferes = JSON.parse(localStorage.getItem("choferes")) || ["Chofer 1", "Chofer 2"];
-      actualizarSelector();
-    }
-
-    function actualizarSelector() {
-      const select = document.getElementById("chofer");
-      select.innerHTML = "";
-      choferes.forEach((c, i) => {
-        const option = document.createElement("option");
-        option.value = i;
-        option.textContent = c;
-        select.appendChild(option);
-      });
-    }
-
-    function agregarChofer() {
-      const nuevo = prompt("Nombre del nuevo chofer:");
-      if (nuevo) {
-        choferes.push(nuevo);
-        guardarChoferes();
-      }
-    }
-
-    function editarChofer() {
-      const idx = document.getElementById("chofer").value;
-      const nuevo = prompt("Editar nombre:", choferes[idx]);
-      if (nuevo) {
-        choferes[idx] = nuevo;
-        guardarChoferes();
-      }
-    }
-
-    function borrarChofer() {
-      const idx = document.getElementById("chofer").value;
-      if (confirm(`¿Eliminar a ${choferes[idx]}?`)) {
-        choferes.splice(idx, 1);
-        guardarChoferes();
-      }
-    }
-
-    function guardarChoferes() {
-      localStorage.setItem("choferes", JSON.stringify(choferes));
-      actualizarSelector();
-    }
-
-    function parsearDatos(texto) {
-      const partes = texto.split(/[, ]+/);
+    function actualizarTotal() {
       let total = 0;
-      partes.forEach(p => {
-        if (p.endsWith("f")) {
-          total += parseInt(p) * 100;
-        } else {
-          total += parseInt(p);
-        }
+      const filas = document.querySelectorAll(".tabla tbody tr");
+      filas.forEach(fila => {
+        const valor = parseInt(fila.children[0].textContent.replace(/\./g, ''));
+        const cantidad = parseInt(fila.children[1].querySelector("input").value) || 0;
+        const esFajo = fila.classList.contains("fajos");
+        const suma = cantidad * valor * (esFajo ? 100 : 1);
+        fila.children[2].textContent = suma.toLocaleString();
+        total += suma;
       });
-      return total;
+      document.getElementById("total").textContent = total.toLocaleString();
     }
 
-    async function guardarDatos() {
-      const fecha = document.getElementById("fecha").value;
-      const chofer = choferes[document.getElementById("chofer").value];
-      const datosTexto = document.getElementById("datos").value;
-
-      if (!fecha || !datosTexto) {
-        alert("Completá todos los campos.");
+    function guardarDatos() {
+      const pass = passInput.value.trim();
+      if (pass !== "ocampocomegatos") {
+        alert("Contraseña incorrecta");
         return;
       }
 
-      const total = parsearDatos(datosTexto);
+      const filas = document.querySelectorAll(".tabla tbody tr:not(.fila-grupo)");
+      const datos = Array.from(filas).map(fila => {
+        const valor = fila.children[0].textContent.replace(/\./g, '');
+        const cantidad = fila.children[1].querySelector("input").value;
+        const suma = fila.children[2].textContent.replace(/\./g, '');
+        const tipo = fila.classList.contains("fajos") ? "fajo" : "suelto";
+        return { valor, cantidad, suma, tipo };
+      });
 
-      const data = { fecha, chofer, total };
+      const payload = {
+        chofer: document.getElementById("chofer").value,
+        fecha: fechaInput.value,
+        total: document.getElementById("total").textContent.replace(/\./g, ''),
+        datos
+      };
 
-      try {
-        await fetch(SHEET_URL, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(data)
-        });
-        alert("Datos guardados correctamente.");
-        document.getElementById("datos").value = "";
-      } catch (e) {
-        alert("Error al guardar datos.");
-        console.error(e);
-      }
+      fetch("https://script.google.com/macros/s/AKfycbzsXQFgrgGiFN2UrMtNKVeod_prxby0zExlWbgTm-Oa5-5z6DL7RVe5boA5ZptRTam_MQ/exec", {
+        method: "POST",
+        body: JSON.stringify(payload),
+        headers: {
+          "Content-Type": "application/json"
+        }
+      })
+      .then(r => r.ok ? alert("Datos guardados correctamente.") : alert("Error al guardar."))
+      .catch(err => {
+        console.error(err);
+        alert("Error al conectar con Google Sheets.");
+      });
     }
 
-    async function verTotales() {
-      try {
-        const res = await fetch(SHEET_URL);
-        const data = await res.json();
-
-        let html = "<h4>Totales guardados:</h4><ul>";
-        data.forEach(row => {
-          html += `<li>${row.fecha} - ${row.chofer}: $${row.total}</li>`;
-        });
-        html += "</ul>";
-        document.getElementById("resultados").innerHTML = html;
-      } catch (e) {
-        alert("Error al obtener totales.");
-        console.error(e);
-      }
-    }
+    // Inicializar filas
+    denominaciones.forEach(d => crearFila(d, contenedorSueltos, "suelto"));
+    denominaciones.forEach(d => crearFila(d, contenedorFajos, "fajo"));
   </script>
 </body>
 </html>
